@@ -29,7 +29,7 @@ func TestVerifyComparesContents(t *testing.T) {
 
 func TestWriteEncryptedRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "out.donguri")
-	if err := writeEncrypted(path, testPassword, []byte("acorn")); err != nil {
+	if err := writeEncrypted(path, testPassword, []byte("acorn"), false); err != nil {
 		t.Fatal(err)
 	}
 	file, _ := os.ReadFile(path)
@@ -54,7 +54,7 @@ func TestFailedReadBackKeepsExistingOutput(t *testing.T) {
 		}
 		return verifyWritten(tmpPath, testPassword, []byte("acorn"))
 	}
-	if err := writeAtomically(path, file, corruptingMedium); err == nil {
+	if err := writeAtomically(path, file, true, corruptingMedium); err == nil {
 		t.Fatal("write with a failing read-back succeeded")
 	}
 	if got, _ := os.ReadFile(path); string(got) != "previous" {
@@ -63,5 +63,28 @@ func TestFailedReadBackKeepsExistingOutput(t *testing.T) {
 	entries, _ := os.ReadDir(filepath.Dir(path))
 	if len(entries) != 1 {
 		t.Fatalf("temporary file left behind: %v", entries)
+	}
+}
+
+func TestWriteAtomicallyOverwritesOnlyWhenAllowed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.donguri")
+	os.WriteFile(path, []byte("appeared meanwhile"), 0o600)
+	noCheck := func(string) error { return nil }
+
+	if err := writeAtomically(path, []byte("new"), false, noCheck); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("no-clobber write over an existing file: %v", err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "appeared meanwhile" {
+		t.Fatalf("existing file was changed to %q", got)
+	}
+	if entries, _ := os.ReadDir(filepath.Dir(path)); len(entries) != 1 {
+		t.Fatalf("temporary file left behind: %v", entries)
+	}
+
+	if err := writeAtomically(path, []byte("new"), true, noCheck); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(path); string(got) != "new" {
+		t.Fatalf("forced write left %q", got)
 	}
 }

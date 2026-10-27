@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -68,7 +69,7 @@ func runEncrypt(args []string) error {
 
 	if !*force {
 		if _, err := os.Lstat(*out); err == nil {
-			return fmt.Errorf("%s already exists (use --force to overwrite)", *out)
+			return errOutputExists(*out)
 		}
 	}
 
@@ -88,7 +89,7 @@ func runEncrypt(args []string) error {
 	}
 	defer clear(password)
 
-	if err := writeEncrypted(*out, password, plaintext); err != nil {
+	if err := writeEncrypted(*out, password, plaintext, *force); err != nil {
 		return err
 	}
 	fmt.Fprintf(os.Stderr, "Encrypted and verified %s\n", *out)
@@ -115,12 +116,12 @@ func readNewPassword() ([]byte, error) {
 	return password, nil
 }
 
-func writeEncrypted(path string, password, plaintext []byte) error {
+func writeEncrypted(path string, password, plaintext []byte, overwrite bool) error {
 	file, err := encrypt(password, plaintext)
 	if err != nil {
 		return err
 	}
-	return writeAtomically(path, file, func(written string) error {
+	return writeAtomically(path, file, overwrite, func(written string) error {
 		if err := verifyWritten(written, password, plaintext); err != nil {
 			return fmt.Errorf("read-back check failed, %s left unchanged: %w", path, err)
 		}
@@ -128,7 +129,7 @@ func writeEncrypted(path string, password, plaintext []byte) error {
 	})
 }
 
-func writeAtomically(path string, data []byte, checkBeforeRename func(tmpPath string) error) error {
+func writeAtomically(path string, data []byte, overwrite bool, checkBeforeRename func(tmpPath string) error) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".donguri-*.tmp")
 	if err != nil {
 		return err
@@ -152,11 +153,38 @@ func writeAtomically(path string, data []byte, checkBeforeRename func(tmpPath st
 	if err := checkBeforeRename(tmp.Name()); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
+	if overwrite {
+		err = os.Rename(tmp.Name(), path)
+	} else {
+		err = moveNoClobber(tmp.Name(), path)
+	}
+	if err != nil {
 		return err
 	}
 	committed = true
 	return nil
+}
+
+func moveNoClobber(src, dst string) error {
+	err := os.Link(src, dst)
+	if err == nil {
+		os.Remove(src)
+		return nil
+	}
+	if errors.Is(err, fs.ErrExist) {
+		return errOutputExists(dst)
+	}
+	// FAT/exFAT has no hard links, so fall back to a re-check that leaves only a two-syscall window.
+	if _, err := os.Lstat(dst); err == nil {
+		return errOutputExists(dst)
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return os.Rename(src, dst)
+}
+
+func errOutputExists(path string) error {
+	return fmt.Errorf("%s already exists (use --force to overwrite)", path)
 }
 
 func verifyWritten(path string, password, plaintext []byte) error {
