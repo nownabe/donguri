@@ -16,8 +16,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Tests run code from this repository, so they get no write access to the
+  # Release or to the files that are released.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Set up tools
+        uses: jdx/mise-action@be3be2260bc02bc3fbf94c5e2fed8b7964baf074 # v3.4.0
+        with:
+          install_args: go
+          cache: false
+      - name: Test
+        run: go vet ./... && go test ./...
+
   goreleaser:
     name: GoReleaser
+    needs: test
     environment: publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -38,8 +60,6 @@ jobs:
           install_args: go aqua:goreleaser/goreleaser
           # A poisoned cache could taint the released binaries.
           cache: false
-      - name: Test
-        run: go vet ./... && go test ./...
       # release-please pushes the tag before it creates the draft. Without the
       # draft, GoReleaser would create a separate release instead.
       - name: Wait for the draft release
