@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"unsafe"
 )
 
 const (
@@ -102,7 +101,7 @@ func checkIterations(n uint32) error {
 }
 
 func newAEAD(password, salt []byte, iterations uint32) (cipher.AEAD, error) {
-	key, err := pbkdf2.Key(sha256.New, aliasString(password), salt, int(iterations), keySize)
+	key, err := pbkdf2.Key(sha256.New, string(password), salt, int(iterations), keySize)
 	if err != nil {
 		return nil, err
 	}
@@ -112,12 +111,4 @@ func newAEAD(password, salt []byte, iterations uint32) (cipher.AEAD, error) {
 		return nil, err
 	}
 	return cipher.NewGCM(block)
-}
-
-// pbkdf2.Key takes a string; converting normally would leave a copy of the password that cannot be wiped.
-func aliasString(b []byte) string {
-	if len(b) == 0 {
-		return ""
-	}
-	return unsafe.String(&b[0], len(b))
 }
