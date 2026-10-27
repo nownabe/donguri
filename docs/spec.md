@@ -42,7 +42,7 @@ The password is **always read from the terminal, without echo** (`/dev/tty` on U
 - Ask for the password twice; stop if they do not match
 - Stop if `<out>` already exists (`--force` to overwrite)
 - Write to a temporary file in the same directory, then rename, so a crash never leaves a broken file. Permissions 0600 (may be ignored on Windows)
-- Immediately after writing, read the file back, decrypt it, and confirm it matches the original plaintext before reporting success (to catch a faulty storage medium on the spot)
+- Immediately after writing, read the temporary file back, decrypt it, and confirm it matches the original plaintext before renaming it to `<out>` (to catch a faulty storage medium on the spot without destroying an existing `<out>`)
 
 ### `donguri decrypt <file>`
 

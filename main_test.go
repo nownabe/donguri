@@ -41,3 +41,27 @@ func TestWriteEncryptedRoundTrip(t *testing.T) {
 		t.Fatalf("temporary file left behind: %v", entries)
 	}
 }
+
+func TestFailedReadBackKeepsExistingOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.donguri")
+	if err := os.WriteFile(path, []byte("previous"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	file := sealFast(t, testPassword, []byte("acorn"))
+	corruptingMedium := func(tmpPath string) error {
+		if err := os.WriteFile(tmpPath, []byte("corrupted"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return verifyWritten(tmpPath, testPassword, []byte("acorn"))
+	}
+	if err := writeAtomically(path, file, corruptingMedium); err == nil {
+		t.Fatal("write with a failing read-back succeeded")
+	}
+	if got, _ := os.ReadFile(path); string(got) != "previous" {
+		t.Fatalf("existing output = %q, want it unchanged", got)
+	}
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	if len(entries) != 1 {
+		t.Fatalf("temporary file left behind: %v", entries)
+	}
+}
