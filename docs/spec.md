@@ -68,10 +68,11 @@ Pushing a tag builds with GitHub Actions and publishes the following to the Rele
 - Binaries (`CGO_ENABLED=0`, `-trimpath`): `windows/amd64`, `windows/arm64`, `linux/amd64`, `linux/arm64`, `darwin/arm64`
 - **One bundle zip**: all of the binaries above + the full source + `README.md` + `FORMAT.md`. Keeping this one file should be enough to run the tool on any of these platforms, or to rebuild it from source
 - `SHA256SUMS`: sha256 of every file in the Release (including the bundle zip)
+- A build provenance attestation for every file in `SHA256SUMS`, signed in a job separate from the build; only that job has `id-token: write`
 
 ## 5. Documentation
 
-- `README.md`: usage, how to verify the artifacts (`sha256sum -c SHA256SUMS`), how to build from source (plain `go build` must be enough)
+- `README.md`: usage, how to verify the artifacts (`sha256sum -c SHA256SUMS`, and `gh attestation verify` pinned to `publish.yaml` and the tag), how to build from source (plain `go build` must be enough)
 - `FORMAT.md`: describes the format in section 2 so that it can be read on its own. Include **how to decrypt without Go** (e.g. Python's `hashlib.pbkdf2_hmac` plus any AES-GCM implementation) and **test vectors** (password, salt, nonce, iteration count, plaintext, and the resulting encrypted file in hex). Even if this tool disappears, this document alone must be enough to decrypt a file
 
 ## 6. Tests
