@@ -120,17 +120,15 @@ func writeEncrypted(path string, password, plaintext []byte) error {
 	if err != nil {
 		return err
 	}
-	if err := writeAtomically(path, file); err != nil {
-		return err
-	}
-	if err := verifyWritten(path, password, plaintext); err != nil {
-		os.Remove(path)
-		return fmt.Errorf("read-back check of %s failed, file removed: %w", path, err)
-	}
-	return nil
+	return writeAtomically(path, file, func(written string) error {
+		if err := verifyWritten(written, password, plaintext); err != nil {
+			return fmt.Errorf("read-back check failed, %s left unchanged: %w", path, err)
+		}
+		return nil
+	})
 }
 
-func writeAtomically(path string, data []byte) error {
+func writeAtomically(path string, data []byte, checkBeforeRename func(tmpPath string) error) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".donguri-*.tmp")
 	if err != nil {
 		return err
@@ -149,6 +147,9 @@ func writeAtomically(path string, data []byte) error {
 		return err
 	}
 	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := checkBeforeRename(tmp.Name()); err != nil {
 		return err
 	}
 	if err := os.Rename(tmp.Name(), path); err != nil {
