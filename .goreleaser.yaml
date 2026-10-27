@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: donguri
+
+builds:
+  - binary: "{{ .Os }}_{{ .Arch }}/donguri"
+    no_unique_dist_dir: true
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -X main.version={{ .Version }} -X main.commit={{ .FullCommit }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    targets:
+      - windows_amd64
+      - windows_arm64
+      - linux_amd64
+      - linux_arm64
+      - darwin_arm64
+
+archives:
+  - formats: [binary]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+# The bundle: the full source of the tag (git archive) plus every binary, so keeping this one file is enough to run or rebuild donguri.
+source:
+  enabled: true
+  format: zip
+  name_template: "{{ .ProjectName }}_{{ .Version }}_bundle"
+  prefix_template: "{{ .ProjectName }}_{{ .Version }}/"
+  files:
+    - src: "dist/*/donguri*"
+      dst: bin
+
+checksum:
+  name_template: SHA256SUMS
+
+# release-please writes the release notes.
+changelog:
+  disable: true
+
+release:
+  use_existing_draft: true
+  mode: keep-existing
