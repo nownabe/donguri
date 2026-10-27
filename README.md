@@ -46,6 +46,16 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 On macOS use `shasum -a 256 -c SHA256SUMS --ignore-missing`. On Windows, compare the output of `Get-FileHash <file>` in PowerShell with the line for that file in `SHA256SUMS`.
 
+`SHA256SUMS` sits in the same Release as the files it covers, so it catches a corrupted download but not a replaced one. To check that a file was built by this repository's release workflow from the tag `<tag>` (e.g. `v1.2.3`), verify its build provenance attestation with the [GitHub CLI](https://cli.github.com/):
+
+```sh
+gh attestation verify <file> --repo nownabe/donguri \
+  --signer-workflow nownabe/donguri/.github/workflows/publish.yaml \
+  --source-ref refs/tags/<tag>
+```
+
+Do this when you download a release. The keys that sign attestations rotate over the years, so `sha256sum -c SHA256SUMS` against a `SHA256SUMS` you kept remains the check that works offline and long-term.
+
 ### Use the bundle
 
 ```sh
